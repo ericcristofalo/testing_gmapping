@@ -1,0 +1,102 @@
+<!-- 
+ File Name:         testing_gmapping.launch
+ Date Created:      2017/09/05
+ Date Modified:     2017/09/06
+ Author:            Eric Cristofalo
+ Contact:           eric.cristofalo@gmail.com
+ 
+ Description:       ROS launch file for running gmapping and rviz from a rosbag with pose, odometry, and scan topics.
+
+                    Only the /scan and /robot_1/odom topics are actually required for gmapping to work. 
+
+                    The /robot_1/pose topic is provided to compare gmapping's estimate to the ground truth (from motion capture). This is not required for gmapping. Not super important, but I also used /robot_1/pose to generate the noisy odometry topic since odometry is not output from the robot by default. 
+
+ Static Transform Links:  frame 1 to frame 2: x,y,x translation followed by z,y,x euler angles in that order!
+-->
+
+<launch>
+
+
+  <!-- ========== SET ROS CLOCK TO SIMULATED CLOCK PUBLISHED IN ROSBAG ========== -->
+	<param name="use_sim_time" value="true" />
+  <!-- Note: This must be set prior to launching the nodes when using a rosbag! -->
+
+  <!-- ========== ROSBAG PLAYBACK LAUNCH FILE ========== -->
+  <arg name="playback_speed" default="10" />
+	<arg name="path" default="$(find testing_gmapping)/data/" />
+	<arg name="file_name" default="testing_gmapping" />
+	<node pkg=	"rosbag" type="play" name="bag_player" output="screen" args="--clock -q -r $(arg playback_speed) $(arg path)$(arg file_name).bag"/>
+  <!-- Note: run "$rosbag info testing_gmapping.bag" to see topics in bag. Should include /scan, /robot_1/pose, and /robot_1/odom -->
+	
+  <!-- ========== RVIZ FOR MAPPING OUTPUT VISUALIZATION ========== -->
+  <node name="rviz" pkg="rviz" type="rviz" respawn="false" output="screen" 
+    args="-f world_rviz -d $(find depth_from_focus)/rviz/testing_gmappng.rviz" required="true">
+  </node>
+  <node pkg="tf" type="static_transform_publisher" name="trans_pub_rviz_world"
+    args="0 0 0 1.5708 0 3.1415 /world_rviz /world 100">
+  </node>
+  <!-- Note: I defined world_rviz as my RViz frame, and world as my mapping frame. This is because the world frame matches the motion capture's frame where world_rviz is just the default coordinate system in RViz. -->
+
+  <!-- ========== GROUND TRUTH TF FOR VISUALIZATION AND COMPARISON ========== -->
+  <node name="ground_truth_rebroadcaster" pkg="depth_from_focus" type="tf_rebroadcaster" respawn="false" output="screen">
+    <remap from="/robot" to="/robot_1/pose"/>  
+    <param name="display_data_flag" type="int" value="0"/>
+    <param name="input_data_type_index" type="int" value="0"/>
+    <param name="source_frame" type="string" value="/world"/>
+    <param name="destination_frame" type="string" value="/base_link_gt"/>
+  </node>
+  <!-- ========== ODOM TF FOR ODOM DATA ========== -->
+  <node name="odom_rebroadcaster" pkg="depth_from_focus" type="tf_rebroadcaster" respawn="false" output="screen">
+    <remap from="/robot" to="/robot_1/odom"/>  
+    <param name="display_data_flag" type="int" value="0"/>
+    <param name="input_data_type_index" type="int" value="1"/>
+    <param name="source_frame" type="string" value="/odom_frame"/>
+    <param name="destination_frame" type="string" value="/base_link"/>
+  </node>
+  <!-- Note: The rosbag I recorded does NOT have a /tf topic on purpose so you can see which links are required. I use these two nodes to re-broadcast /tf links for the ground truth tf (/base_link_gt) and the odometry tf (/base_link). -->
+
+  <!-- ========== STATIC TF FROM BASE_lINK TO SCAN_FRAME ========== -->
+  <node pkg="tf" type="static_transform_publisher" name="trans_pub_base_scan"
+    args="0 0 0 0 0 0 /base_link /raw_laser_scan_frame 100">
+  </node>
+  <!-- Note: Must link the scan to the robot. -->
+
+  <!-- ========== GMAPPING ========== -->
+  <node pkg="gmapping" type="slam_gmapping" name="slam_gmapping" output="screen">
+    <remap from="scan" to="/scan"/>
+    <param name="base_frame" value="/base_link"/>
+    <param name="odom_frame" value="/odom_frame"/>
+    <param name="map_frame" value="/world"/>
+    <param name="map_update_interval" value="1.0"/>
+    <param name="linearUpdate" value="0.01"/>
+    <param name="angularUpdate" value="0.01"/>
+    <param name="maxUrange" value="6.0"/>
+    <param name="sigma" value="0.05"/>
+    <param name="kernelSize" value="1"/>
+    <param name="lstep" value="0.05"/>
+    <param name="astep" value="0.05"/>
+    <param name="iterations" value="5"/>
+    <param name="lsigma" value="0.075"/>
+    <param name="ogain" value="3.0"/>
+    <param name="lskip" value="0"/>
+    <param name="srr" value="0.01"/>
+    <param name="srt" value="0.02"/>
+    <param name="str" value="0.01"/>
+    <param name="stt" value="0.02"/>
+    <param name="temporalUpdate" value="1.0"/>
+    <param name="resampleThreshold" value="0.5"/>
+    <param name="particles" value="100"/>
+    <param name="xmin" value="-50.0"/>
+    <param name="ymin" value="-50.0"/>
+    <param name="xmax" value="50.0"/>
+    <param name="ymax" value="50.0"/>
+    <param name="delta" value="0.1"/>
+    <param name="llsamplerange" value="0.01"/>
+    <param name="llsamplestep" value="0.01"/>
+    <param name="lasamplerange" value="0.005"/>
+    <param name="lasamplestep" value="0.005"/>
+  </node>
+
+
+</launch>
+

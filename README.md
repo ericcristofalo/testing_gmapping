@@ -12,7 +12,13 @@ Tested on: ROS Kinetic
 # Instructions
 * git clone this package in your catkin_ws
 * catkin build the workspace
-* run: $roslaunch testing_gmapping testing_gmapping.launch 
+* run: $roscore
+* run: $roslaunch testing_gmapping testing_gmapping.launch
+
+# Notes
+* For context, this data comes from a Microsoft Kinect's depth map output that I sampled into a "laser scan." Although not as ideal a real laser scanner, this is good enough for the gmapping package. 
+* The map topic will show up as "undefined" in RViz initially. Give it a minute to populate since the scans are very slow compared to the odometry messages (there are only five scans total). 
+* The overall map doesn't actually look that good and the final estimate robot pose is wrong. This is probably because this was one of the first rosbags I made and I didn't sample the kinect enough. It's just a reference to set up gmapping!
 
 # Requirements
 * gmapping
